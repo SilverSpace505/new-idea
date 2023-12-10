@@ -20,6 +20,26 @@ var loadingChunks = []
 
 var tzoom = 1
 
+function isColliding() {
+    for (let chunk in chunks) {
+        for (let obj of chunks[chunk].objs) {
+            if (obj.co == 1) {
+                if (obj.t == "c") {
+                    if (Math.sqrt((obj.x-player.x)**2 + (obj.y-player.y)**2) < obj.s+15) {
+                        return true
+                    }
+                } else if (obj.t == "r") {
+                    if (player.x+15 > obj.x-obj.w/2 && player.x-15 < obj.x+obj.w/2 &&
+                    player.y+15 > obj.y-obj.h/2 && player.y-15 < obj.y+obj.h/2) {
+                        return true
+                    }
+                }
+            }
+        }
+    }
+    return false
+}
+
 function tick(timestamp) {
     requestAnimationFrame(tick)
 
@@ -28,18 +48,29 @@ function tick(timestamp) {
     ui.getSu()
     input.setGlobals()
 
+    let last = {x: player.x, y: player.y}
     if (keys["KeyW"]) {
         player.y -= 250*delta
     }
     if (keys["KeyS"]) {
         player.y += 250*delta
     }
+
+    if (isColliding()) {
+        player.y = last.y
+    }
+
     if (keys["KeyA"]) {
         player.x -= 250*delta
     }
     if (keys["KeyD"]) {
         player.x += 250*delta
     }
+
+    if (isColliding()) {
+        player.x = last.x
+    }
+
     if (keys["Minus"]) {
         tzoom *= 0.995
     }
@@ -65,7 +96,7 @@ function tick(timestamp) {
         let wcmouse = {x: Math.floor(wmouse.x/500), y: Math.floor(wmouse.y/500)}
         let chunk = wcmouse.x+","+wcmouse.y
         if (chunk in chunks && chunks[chunk].objs.length < 150) {
-            let obj = {i: getId(chunk), t: "c", x: wmouse.x, y: wmouse.y, s: 10, c: [150, 100, 0, 1]}
+            let obj = {i: getId(chunk), t: "c", co: 1, x: wmouse.x, y: wmouse.y, s: 10, c: [150, 100, 0, 1]}
             chunks[chunk].objs.push(obj)
             sendMsg({create: [chunk, obj]})
         }
@@ -89,6 +120,21 @@ function tick(timestamp) {
         }
     }
 
+    for (let chunk in chunks) {
+        if (poses.includes(chunk)) {
+            let sp = chunk.split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
+            for (let x = 0; x < 20; x++) {
+                for (let y = 0; y < 20; y++) {
+                    let i = x*20+y
+                    if (chunks[chunk].grid[i] > 0.5) {
+                        ui.rect(cx(sp[0]*500 + x*25 + 12.5), cy(sp[1]*500 + y*25 + 12.5), 25*camera.zoom, 25*camera.zoom, [50, 160, 0, 1])
+                    }
+                }
+            }
+        } else {
+            delete chunks[chunk]
+        }
+    }
     for (let chunk in chunks) {
         if (poses.includes(chunk)) {
             let obj
@@ -177,21 +223,31 @@ function genChunk(x, y) {
     randi = 0
     let amt = rand(id)*50 + 50
     for (let i = 0; i < amt; i++) {
-        objs.push({i: objs.length, t: "c", x: rand(id)*500 + x*500, y: rand(id)*500 + 500*y, s: 5, c: [40, 120, 0, 1]})
+        objs.push({i: objs.length, t: "c", co: 0, x: rand(id)*500 + x*500, y: rand(id)*500 + 500*y, s: 5, c: [40, 120, 0, 1]})
     }
     amt = rand(id)*1
     for (let i = 0; i < amt; i++) {
         let pos = {x: rand(id)*500 + x*500, y: rand(id)*500 + y*500}
-        objs.push({i: objs.length, t: "r", x: pos.x, y: pos.y, w: 100, h: 100, c: [100, 50, 0, 1]})
-        objs.push({i: objs.length, t: "r", x: pos.x - 50, y: pos.y, w: 10, h: 100, c: [150, 100, 0, 1]})
-        objs.push({i: objs.length, t: "r", x: pos.x + 50, y: pos.y, w: 10, h: 100, c: [150, 100, 0, 1]})
-        objs.push({i: objs.length, t: "r", x: pos.x, y: pos.y - 50, w: 100, h: 10, c: [150, 100, 0, 1]})
+        objs.push({i: objs.length, t: "r", co: 0, x: pos.x, y: pos.y, w: 100, h: 100, c: [100, 50, 0, 1]})
+        objs.push({i: objs.length, t: "r", co: 1, x: pos.x - 50, y: pos.y, w: 10, h: 100, c: [150, 100, 0, 1]})
+        objs.push({i: objs.length, t: "r", co: 1, x: pos.x + 50, y: pos.y, w: 10, h: 100, c: [150, 100, 0, 1]})
+        objs.push({i: objs.length, t: "r", co: 1, x: pos.x, y: pos.y - 50, w: 100, h: 10, c: [150, 100, 0, 1]})
     }
     amt = rand(id)*5 + 5
     for (let i = 0; i < amt; i++) {
-        objs.push({i: objs.length, t: "c", x: rand(id)*500 + x*500, y: rand(id)*500 + 500*y, s: 25, c: [127, 127, 127, 1]})
+        objs.push({i: objs.length, t: "c", co: 1, x: rand(id)*500 + x*500, y: rand(id)*500 + 500*y, s: 25, c: [127, 127, 127, 1]})
     }
-    chunks[x+","+y] = {objs: objs, grid: []}
+    let grid = []
+    let wx = 0
+    let wy = 0
+    for (let gx = 0; gx < 20; gx++) {
+        for (let gy = 0; gy < 20; gy++) {
+            wx = gx+x*20
+            wy = gy+y*20
+            grid.push(Math.sin(wx/10)*Math.sin(wy/10))
+        }
+    }
+    chunks[x+","+y] = {objs: objs, grid: grid}
 }
 
 function cx(x) {

@@ -62,9 +62,9 @@ function connectToServer() {
         if ("delete" in msg) {
             let chunk = msg.delete[0]
             if (chunk in chunks) {
-                for (let i = 0; i < chunks[chunk].length; i++) {
-                    if (chunks[chunk][i].i == msg.delete[1]) {
-                        chunks[chunk].splice(i, 1)
+                for (let i = 0; i < chunks[chunk].objs.length; i++) {
+                    if (chunks[chunk].objs[i].i == msg.delete[1]) {
+                        chunks[chunk].objs.splice(i, 1)
                         i--
                     }
                 }
@@ -73,7 +73,7 @@ function connectToServer() {
         if ("create" in msg) {
             let chunk = msg.create[0]
             if (chunk in chunks) {
-                chunks[chunk].push(msg.create[1])
+                chunks[chunk].objs.push(msg.create[1])
             }
         }
     })
