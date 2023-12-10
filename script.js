@@ -65,6 +65,7 @@ function setVal(x, y, v) {
     if (chunk in chunks) {
         chunks[chunk].grid[cip[0]*20+cip[1]] = v
     }
+    return [cp, cip]
 }
 
 function line(vec1, vec2) {
@@ -73,6 +74,33 @@ function line(vec1, vec2) {
     ctx.lineTo(cx(vec2.x), cy(vec2.y))
     ctx.stroke()
 }
+
+setInterval(() => {
+    input.setGlobals()
+    let wmouse = {x: (mouse.x - canvas.width/2)/camera.zoom + camera.x, y: (mouse.y - canvas.height/2)/camera.zoom + camera.y}
+    if (mouse.ldown && !keys["ShiftLeft"]) {
+        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
+        let d = Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)*2
+        let v = getVal(ro.x/25, ro.y/25)
+        if (d/25 < v) {
+            let ps = setVal(ro.x/25, ro.y/25, d/25)
+            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], d/25]})
+        }
+    }
+
+    if (mouse.rdown && !keys["ShiftLeft"]) {
+        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
+        let d = 50-Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
+        let v = getVal(ro.x/25, ro.y/25)
+        if (d/25 > 1) {
+            d = 25
+        }
+        if (d/25 > v) {
+            let ps = setVal(ro.x/25, ro.y/25, d/25)
+            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], d/25]})
+        }
+    }
+}, 1000/10)
 
 function tick(timestamp) {
     requestAnimationFrame(tick)
@@ -136,28 +164,6 @@ function tick(timestamp) {
             sendMsg({create: [chunk, obj]})
         }
     }
-
-    if (mouse.ldown && !keys["ShiftLeft"]) {
-        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
-        let d = Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
-        let v = getVal(ro.x/25, ro.y/25)
-        if (d/25 < v) {
-            setVal(ro.x/25, ro.y/25, d/25)
-        }
-    }
-
-    if (mouse.rdown && !keys["ShiftLeft"]) {
-        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
-        let d = 25-Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
-        let v = getVal(ro.x/25, ro.y/25)
-        if (d/25 > 1) {
-            d = 25
-        }
-        if (d/25 > v) {
-            setVal(ro.x/25, ro.y/25, d/25)
-        }
-    }
-
     ui.rect(canvas.width/2, canvas.height/2, canvas.width, canvas.height, [60, 180, 0, 1])
 
     let cp = {x: Math.floor(player.x/500), y: Math.floor(player.y/500)}

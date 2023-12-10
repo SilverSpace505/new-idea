@@ -42,6 +42,7 @@ function connectToServer() {
         }
         if ("chunk" in msg) {
             let chunk = msg.chunk[0]
+            let sp = chunk.split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
             loadingChunks.splice(loadingChunks.indexOf(chunk), 1)
             genChunk(parseInt(chunk.split(",")[0]), parseInt(chunk.split(",")[1]))
             if (msg.chunk[1] && chunk in chunks) {
@@ -56,6 +57,9 @@ function connectToServer() {
                             i--
                         }
                     }
+                }
+                for (let set of data.sets) {
+                    setVal(set[0]+sp[0]*20, set[1]+sp[1]*20, set[2])
                 }
             }
         }
@@ -75,6 +79,11 @@ function connectToServer() {
             if (chunk in chunks) {
                 chunks[chunk].objs.push(msg.create[1])
             }
+        }
+        if ("set" in msg) {
+            console.log("YAY", msg.set)
+            let sp = msg.set[0].split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
+            setVal(msg.set[1]+sp[0]*20, msg.set[2]+sp[1]*20, msg.set[3])
         }
     })
 
@@ -101,6 +110,8 @@ setInterval(() =>  {
         connectToServer()
     }
 }, 2000)
+
+let setq = []
 
 setInterval(() => {
     if (connected) {
