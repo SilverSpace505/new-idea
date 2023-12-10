@@ -21,7 +21,6 @@ var loadingChunks = []
 var tzoom = 1
 
 function isColliding() {
-    return false
     for (let chunk in chunks) {
         for (let obj of chunks[chunk].objs) {
             if (obj.co == 1) {
