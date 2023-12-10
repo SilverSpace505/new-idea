@@ -21,6 +21,7 @@ var loadingChunks = []
 var tzoom = 1
 
 function isColliding() {
+    return false
     for (let chunk in chunks) {
         for (let obj of chunks[chunk].objs) {
             if (obj.co == 1) {
@@ -40,6 +41,40 @@ function isColliding() {
     return false
 }
 
+function intWeights(v1, w1, v2, w2) {
+    if (w1 < 0) w1 = 0
+    if (w2 < 0) w2 = 0
+    let total = w1+w2
+    return  (w1 * v1 + w2 * v2) / total
+}
+
+function getVal(x, y) {
+    let cp = [Math.floor(x/20), Math.floor(y/20)]
+    let cip = [x-cp[0]*20, y-cp[1]*20]
+    let chunk = cp[0]+","+cp[1]
+    if (chunk in chunks) {
+        return chunks[chunk].grid[cip[0]*20+cip[1]]
+    } else {
+        return 0
+    }
+}
+
+function setVal(x, y, v) {
+    let cp = [Math.floor(x/20), Math.floor(y/20)]
+    let cip = [x-cp[0]*20, y-cp[1]*20]
+    let chunk = cp[0]+","+cp[1]
+    if (chunk in chunks) {
+        chunks[chunk].grid[cip[0]*20+cip[1]] = v
+    }
+}
+
+function line(vec1, vec2) {
+    ctx.beginPath()
+    ctx.moveTo(cx(vec1.x), cy(vec1.y))
+    ctx.lineTo(cx(vec2.x), cy(vec2.y))
+    ctx.stroke()
+}
+
 function tick(timestamp) {
     requestAnimationFrame(tick)
 
@@ -47,6 +82,8 @@ function tick(timestamp) {
     ui.resizeCanvas()
     ui.getSu()
     input.setGlobals()
+
+    let orig = isColliding()
 
     let last = {x: player.x, y: player.y}
     if (keys["KeyW"]) {
@@ -56,7 +93,7 @@ function tick(timestamp) {
         player.y += 250*delta
     }
 
-    if (isColliding()) {
+    if (!orig && isColliding()) {
         player.y = last.y
     }
 
@@ -67,7 +104,7 @@ function tick(timestamp) {
         player.x += 250*delta
     }
 
-    if (isColliding()) {
+    if (!orig && isColliding()) {
         player.x = last.x
     }
 
@@ -78,8 +115,8 @@ function tick(timestamp) {
         tzoom *= 1.005
     }
 
-    if (mouse.lclick) {
-        let wmouse = {x: (mouse.x - canvas.width/2)/camera.zoom + camera.x, y: (mouse.y - canvas.height/2)/camera.zoom + camera.y}
+    let wmouse = {x: (mouse.x - canvas.width/2)/camera.zoom + camera.x, y: (mouse.y - canvas.height/2)/camera.zoom + camera.y}
+    if (mouse.lclick && keys["ShiftLeft"]) {
         for (let chunk in chunks) {
             for (let i = 0; i < chunks[chunk].objs.length; i++) {
                 if (Math.sqrt((chunks[chunk].objs[i].x-wmouse.x)**2 + (chunks[chunk].objs[i].y-wmouse.y)**2) < 10) {
@@ -91,14 +128,34 @@ function tick(timestamp) {
         }
     }
 
-    if (mouse.rclick) {
-        let wmouse = {x: (mouse.x - canvas.width/2)/camera.zoom + camera.x, y: (mouse.y - canvas.height/2)/camera.zoom + camera.y}
+    if (mouse.rclick && keys["ShiftLeft"]) {
         let wcmouse = {x: Math.floor(wmouse.x/500), y: Math.floor(wmouse.y/500)}
         let chunk = wcmouse.x+","+wcmouse.y
         if (chunk in chunks && chunks[chunk].objs.length < 150) {
             let obj = {i: getId(chunk), t: "c", co: 1, x: wmouse.x, y: wmouse.y, s: 10, c: [150, 100, 0, 1]}
             chunks[chunk].objs.push(obj)
             sendMsg({create: [chunk, obj]})
+        }
+    }
+
+    if (mouse.ldown && !keys["ShiftLeft"]) {
+        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
+        let d = Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
+        let v = getVal(ro.x/25, ro.y/25)
+        if (d/25 < v) {
+            setVal(ro.x/25, ro.y/25, d/25)
+        }
+    }
+
+    if (mouse.rdown && !keys["ShiftLeft"]) {
+        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
+        let d = 25-Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
+        let v = getVal(ro.x/25, ro.y/25)
+        if (d/25 > 1) {
+            d = 25
+        }
+        if (d/25 > v) {
+            setVal(ro.x/25, ro.y/25, d/25)
         }
     }
 
@@ -126,8 +183,110 @@ function tick(timestamp) {
             for (let x = 0; x < 20; x++) {
                 for (let y = 0; y < 20; y++) {
                     let i = x*20+y
-                    if (chunks[chunk].grid[i] > 0.5) {
-                        ui.rect(cx(sp[0]*500 + x*25 + 12.5), cy(sp[1]*500 + y*25 + 12.5), 25*camera.zoom, 25*camera.zoom, [50, 160, 0, 1])
+                    if (getVal(x+sp[0]*20, y+sp[1]*20) > 0.5) {
+                        // ui.circle(cx(sp[0]*500 + x*25), cy(sp[1]*500 + y*25), 5*camera.zoom, [0, 0, 0, 1])
+                    }
+                }
+            }
+            
+            let values = []
+            let values2 = []
+            let min = 0.5
+            let id = 0
+            let wx = 0
+            let wy = 0
+            let smoothing = !keys["Space"]
+            for (let x = 0; x < 20; x++) {
+                for (let y = 0; y < 20; y++) {
+                    // ui.rect(cx(x*25 + sp[0]*500 + 12.5), cy(y*25 + sp[1]*500 + 12.5), 20*camera.zoom, 20*camera.zoom, [127, 127, 127, 0.5])
+                    wx = x+sp[0]*20
+                    wy = y+sp[1]*20
+                    values = [getVal(wx, wy), getVal(wx+1, wy), getVal(wx+1, wy+1), getVal(wx, wy+1)]
+                    values2 = [values[0] > min ? 1 : 0, values[1] > min ? 1 : 0, values[2] > min ? 1 : 0, values[3] > min ? 1 : 0]
+                    values[0] += min/2; values[1] += min/2; values[2] += min/2; values[3] += min/2
+                    id = values2[0]*1 + values2[1]*2 + values2[2]*4 + values2[3]*8
+
+                    let a = {}; let b = {}; let c = {}; let d = {}
+                    if (smoothing) {
+                        a = {x: x*25 + sp[0]*500 + intWeights(0, values[0], 25, values[1]), y: y*25 + sp[1]*500}
+                        b = {x: x*25 + sp[0]*500 + 25, y: y*25 + sp[1]*500 + intWeights(0, values[1], 25, values[2])}
+                        c = {x: x*25 + sp[0]*500 + intWeights(0, values[3], 25, values[2]), y: y*25 + sp[1]*500 + 25}
+                        d = {x: x*25 + sp[0]*500, y: y*25 + sp[1]*500 + intWeights(0, values[0], 25, values[3])}
+                    } else {
+                        a = {x: x*25 + sp[0]*500 + 12.5, y: y*25 + sp[1]*500}
+                        b = {x: x*25 + sp[0]*500 + 25, y: y*25 + sp[1]*500 + 12.5}
+                        c = {x: x*25 + sp[0]*500 + 12.5, y: y*25 + sp[1]*500 + 25}
+                        d = {x: x*25 + sp[0]*500, y: y*25 + sp[1]*500 + 12.5}
+                    }
+
+                    ctx.lineWidth = 3*camera.zoom
+                    ctx.strokeStyle = "darkgreen"
+
+                    switch (id) {
+                        case 0:
+                            break
+                        case 1:
+                            line(d, a)
+                            break
+                        case 2:
+                            line(a, b)
+                            break
+                        case 3:
+                            line(d, b)
+                            break
+                        case 4:
+                            line(b, c)
+                            break
+                        case 5:
+                            line(a, b)
+                            line(d, c)
+                            break
+                        case 6:
+                            line(a, c)
+                            break
+                        case 7:
+                            line(d, c)
+                            // line(d, a)
+                            // line(a, b)
+                            // line(b, c)
+                            break
+                        case 8:
+                            line(d, c)
+                            break
+                        case 9:
+                            line(a, c)
+                            break
+                        case 10:
+                            line(a, d)
+                            line(b, c)
+                            break
+                        case 11:
+                            line(b, c)
+                            // line(c, d)
+                            // line(d, a)
+                            // line(a, b)
+                            break
+                        case 12:
+                            line(d, b)
+                            break
+                        case 13:
+                            line(a, b)
+                            // line(a, d)
+                            // line(d, c)
+                            // line(c, b)
+                            break
+                        case 14:
+                            line(a, d)
+                            // line(a, b)
+                            // line(b, c)
+                            // line(c, d)
+                            break
+                        case 15:
+                            // line(a, b)
+                            // line(b, c)
+                            // line(c, d)
+                            // line(d, a)
+                            break
                     }
                 }
             }
@@ -244,7 +403,8 @@ function genChunk(x, y) {
         for (let gy = 0; gy < 20; gy++) {
             wx = gx+x*20
             wy = gy+y*20
-            grid.push(Math.sin(wx/10)*Math.sin(wy/10))
+            // grid.push(Math.sin(wx/10)*Math.sin(wy/10))
+            grid.push(rand(id)*rand(id) + Math.sin(wx/10)*Math.sin(wy/10))
         }
     }
     chunks[x+","+y] = {objs: objs, grid: grid}

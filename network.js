@@ -1,4 +1,4 @@
-var ws = {}
+var ws = null
 
 var connected = false
 
@@ -20,7 +20,7 @@ function sendMsg(sendData, bypass=false) {
 function connectToServer() {
     console.log("Connecting...")
     if (ws) {
-        if (ws.readyState == WebSocket.OPEN) {
+        if (ws.readyState != WebSocket.CLOSED) {
 			ws.close()
 		}
     }
