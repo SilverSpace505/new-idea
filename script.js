@@ -80,7 +80,7 @@ setInterval(() => {
     let wmouse = {x: (mouse.x - canvas.width/2)/camera.zoom + camera.x, y: (mouse.y - canvas.height/2)/camera.zoom + camera.y}
     if (mouse.ldown && !keys["ShiftLeft"]) {
         let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
-        let d = Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)*2
+        let d = Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)/2
         let v = getVal(ro.x/25, ro.y/25)
         if (d/25 < v) {
             let ps = setVal(ro.x/25, ro.y/25, d/25)
@@ -90,7 +90,7 @@ setInterval(() => {
 
     if (mouse.rdown && !keys["ShiftLeft"]) {
         let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
-        let d = 50-Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
+        let d = 25-Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
         let v = getVal(ro.x/25, ro.y/25)
         if (d/25 > 1) {
             d = 25

@@ -109,7 +109,7 @@ setInterval(() =>  {
     if (!connected || (ws.readyState != WebSocket.OPEN && ws.readyState != WebSocket.CONNECTING)) {
         connectToServer()
     }
-}, 2000)
+}, 3000)
 
 let setq = []
 
