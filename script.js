@@ -20,27 +20,46 @@ var players = {}
 
 var chunks = {}
 var loadingChunks = []
+var tChunks = {}
 
 var setting = []
 
 var tzoom = 1
 
 function isColliding() {
+    let offs = [[0, 0], [10, 0], [-10, 0], [0, 10], [0, -10]]
+    let ppoints = []
+    for (let off of offs) {
+        ppoints.push([off, 0])
+    }
     for (let chunk in chunks) {
         for (let obj of chunks[chunk].objs) {
             if (obj.co == 1) {
                 if (obj.t == "c") {
-                    if (Math.sqrt((obj.x-player.x)**2 + (obj.y-player.y)**2) < obj.s+15) {
+                    if (Math.sqrt((obj.x-player.x)**2 + (obj.y-player.y)**2) < obj.s+10) {
                         return true
                     }
                 } else if (obj.t == "r") {
-                    if (player.x+15 > obj.x-obj.w/2 && player.x-15 < obj.x+obj.w/2 &&
-                    player.y+15 > obj.y-obj.h/2 && player.y-15 < obj.y+obj.h/2) {
+                    if (player.x+10 > obj.x-obj.w/2 && player.x-10 < obj.x+obj.w/2 &&
+                    player.y+10 > obj.y-obj.h/2 && player.y-10 < obj.y+obj.h/2) {
                         return true
                     }
                 }
             }
         }
+        if (chunk in tChunks) {
+            for (let line of tChunks[chunk][0]) {
+                for (let ppoint of ppoints) {
+                    if (findIntersection(player.x+ppoint[0][0], player.y+ppoint[0][1], player.x+ppoint[0][0], player.y+ppoint[0][1] + 10000, line[0].x, line[0].y, line[1].x, line[1].y)) {
+                        ppoint[1] += 1
+                    }
+                }
+                
+            }
+        }
+    }
+    for (let ppoint of ppoints) {
+        if (ppoint[1] % 2 == 1) return true
     }
     return false
 }
@@ -108,6 +127,128 @@ function poly(...points) {
     ctx.fill()
 }
 
+function constructTerrain() {
+    tChunks = {}
+    for (let chunk in chunks) {
+        tChunks[chunk] = constructChunk(chunk)
+    }
+}
+
+function constructChunk(chunk) {
+    let lines = []
+    let polys = []
+    let sp = chunk.split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
+    
+    let values = []
+    let values2 = []
+    let min = 0.5
+    let id = 0
+    let wx = 0
+    let wy = 0
+    let smoothing = !keys["Space"]
+    for (let x = 0; x < res; x++) {
+        for (let y = 0; y < res; y++) {
+            // ui.rect(cx(x*25 + sp[0]*500 + 12.5), cy(y*25 + sp[1]*500 + 12.5), 20*camera.zoom, 20*camera.zoom, [127, 127, 127, 0.5])
+            wx = x+sp[0]*res
+            wy = y+sp[1]*res
+            values = [getVal(wx, wy), getVal(wx+1, wy), getVal(wx+1, wy+1), getVal(wx, wy+1)]
+            values2 = [values[0] > min ? 1 : 0, values[1] > min ? 1 : 0, values[2] > min ? 1 : 0, values[3] > min ? 1 : 0]
+            // values[0] += min/2; values[1] += min/2; values[2] += min/2; values[3] += min/2
+            id = values2[0]*1 + values2[1]*2 + values2[2]*4 + values2[3]*8
+
+            let a = {}; let b = {}; let c = {}; let d = {}
+            if (smoothing) {
+                a = {x: x*s + sp[0]*500 + intWeights(0, values[1], s, values[0]), y: y*s + sp[1]*500}
+                b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + intWeights(0, values[2], s, values[1])}
+                c = {x: x*s + sp[0]*500 + intWeights(0, values[2], s, values[3]), y: y*s + sp[1]*500 + s}
+                d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + intWeights(0, values[3], s, values[0])}
+            } else {
+                a = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500}
+                b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s/2}
+                c = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500 + s}
+                d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s/2}
+            }
+
+            let ac = {x: x*s + sp[0]*500, y: y*s + sp[1]*500}
+            let bc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500}
+            let cc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s}
+            let dc = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s}
+
+            ctx.lineJoin = "round"
+            ctx.lineWidth = 1*camera.zoom
+            ctx.strokeStyle = "darkgreen"
+            ctx.fillStyle = "darkgreen"
+
+            switch (id) {
+                case 0:
+                    break
+                case 1:
+                    lines.push([d, a])
+                    polys.push([d, ac, a])
+                    break
+                case 2:
+                    lines.push([a, b])
+                    polys.push([a, bc, b])
+                    break
+                case 3:
+                    lines.push([d, b])
+                    polys.push([ac, bc, b, d])
+                    break
+                case 4:
+                    lines.push([b, c])
+                    polys.push([b, cc, c])
+                    break
+                case 5:
+                    lines.push([a, b])
+                    lines.push([d, c])
+                    polys.push([d, ac, a, b, cc, c])
+                    break
+                case 6:
+                    lines.push([a, c])
+                    polys.push([bc, cc, c, a])
+                    break
+                case 7:
+                    lines.push([d, c])
+                    polys.push([ac, bc, cc, c, d])
+                    break
+                case 8:
+                    lines.push([d, c])
+                    polys.push([c, dc, d])
+                    break
+                case 9:
+                    lines.push([a, c])
+                    polys.push([ac, a, c, dc])
+                    break
+                case 10:
+                    lines.push([a, d])
+                    lines.push([b, c])
+                    polys.push([d, a, bc, b, c, dc])
+                    break
+                case 11:
+                    lines.push([b, c])
+                    polys.push([dc, ac, bc, b, c])
+                    break
+                case 12:
+                    lines.push([d, b])
+                    polys.push([dc, cc, b, d])
+                    break
+                case 13:
+                    lines.push([a, b])
+                    polys.push([ac, a, b, cc, dc])
+                    break
+                case 14:
+                    lines.push([a, d])
+                    polys.push([a, d, dc, cc, bc])
+                    break
+                case 15:
+                    polys.push([ac, bc, cc, dc])
+                    break
+            }
+        }
+    }
+    return [lines, polys]
+}
+
 setInterval(() => {
     input.setGlobals()
     let wmouse = {x: (mouse.x - canvas.width/2)/camera.zoom + camera.x, y: (mouse.y - canvas.height/2)/camera.zoom + camera.y}
@@ -130,7 +271,7 @@ setInterval(() => {
         }
     }
 
-    if (mouse.rdown && !keys["ShiftLeft"]) {
+    if (mouse.rdown && !keys["ShiftLeft"] && Math.sqrt((wmouse.x-player.x)**2 + (wmouse.y-player.y)**2) > 35) {
         let ro = {x: Math.round(wmouse.x/s)*s, y: Math.round(wmouse.y/s)*s}
         let offs = []
         for (let x = 0; x < 9; x++) {
@@ -158,8 +299,6 @@ function tick(timestamp) {
     ui.getSu()
     input.setGlobals()
 
-    let orig = isColliding()
-
     s = 500/res
 
     for (let i = 0; i < setting.length; i++) {
@@ -173,6 +312,11 @@ function tick(timestamp) {
             i--
         }
     }
+    
+
+    let orig = isColliding()
+
+    constructTerrain()
 
     let last = {x: player.x, y: player.y}
     if (keys["KeyW"]) {
@@ -182,9 +326,9 @@ function tick(timestamp) {
         player.y += 150*delta
     }
 
-    if (!orig && isColliding()) {
-        player.y = last.y
-    }
+    // if (!orig && isColliding()) {
+    //     player.y = last.y
+    // }
 
     if (keys["KeyA"]) {
         player.x -= 150*delta
@@ -193,9 +337,11 @@ function tick(timestamp) {
         player.x += 150*delta
     }
 
-    if (!orig && isColliding()) {
-        player.x = last.x
-    }
+    // if (!orig && isColliding()) {
+    //     player.x = last.x
+    // }
+
+    fixCollision()
 
     if (keys["Minus"]) {
         tzoom *= 0.995
@@ -246,128 +392,141 @@ function tick(timestamp) {
 
     for (let chunk in chunks) {
         if (poses.includes(chunk)) {
-            let sp = chunk.split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
-            if (keys["KeyE"]) {
-                for (let x = 0; x < res; x++) {
-                    for (let y = 0; y < res; y++) {
-                        let i = x*res+y
-                        let v = getVal(x+sp[0]*res, y+sp[1]*res)
-                        if (v < 0) console.log("OH NO")
-                        if (true) {
-                            
-                            ui.circle(cx(sp[0]*500 + x*s), cy(sp[1]*500 + y*s), 5*camera.zoom, [v*255, v*255, v*255, 1])
-                        }
-                    }
+            if (chunk in tChunks) {
+                ctx.lineJoin = "round"
+                ctx.lineWidth = 1*camera.zoom
+                ctx.strokeStyle = "darkgreen"
+                ctx.fillStyle = "darkgreen"
+                for (let line2 of tChunks[chunk][0]) {
+                    line(...line2)
+                }
+                for (let poly2 of tChunks[chunk][1]) {
+                    poly(...poly2)
                 }
             }
             
-            let values = []
-            let values2 = []
-            let min = 0.5
-            let id = 0
-            let wx = 0
-            let wy = 0
-            let smoothing = !keys["Space"]
-            for (let x = 0; x < res; x++) {
-                for (let y = 0; y < res; y++) {
-                    // ui.rect(cx(x*25 + sp[0]*500 + 12.5), cy(y*25 + sp[1]*500 + 12.5), 20*camera.zoom, 20*camera.zoom, [127, 127, 127, 0.5])
-                    wx = x+sp[0]*res
-                    wy = y+sp[1]*res
-                    values = [getVal(wx, wy), getVal(wx+1, wy), getVal(wx+1, wy+1), getVal(wx, wy+1)]
-                    values2 = [values[0] > min ? 1 : 0, values[1] > min ? 1 : 0, values[2] > min ? 1 : 0, values[3] > min ? 1 : 0]
-                    // values[0] += min/2; values[1] += min/2; values[2] += min/2; values[3] += min/2
-                    id = values2[0]*1 + values2[1]*2 + values2[2]*4 + values2[3]*8
+            // let sp = chunk.split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
+            // if (keys["KeyE"]) {
+            //     for (let x = 0; x < res; x++) {
+            //         for (let y = 0; y < res; y++) {
+            //             let i = x*res+y
+            //             let v = getVal(x+sp[0]*res, y+sp[1]*res)
+            //             if (v < 0) console.log("OH NO")
+            //             if (true) {
+                            
+            //                 ui.circle(cx(sp[0]*500 + x*s), cy(sp[1]*500 + y*s), 5*camera.zoom, [v*255, v*255, v*255, 1])
+            //             }
+            //         }
+            //     }
+            // }
+            
+            // let values = []
+            // let values2 = []
+            // let min = 0.5
+            // let id = 0
+            // let wx = 0
+            // let wy = 0
+            // let smoothing = !keys["Space"]
+            // for (let x = 0; x < res; x++) {
+            //     for (let y = 0; y < res; y++) {
+            //         // ui.rect(cx(x*25 + sp[0]*500 + 12.5), cy(y*25 + sp[1]*500 + 12.5), 20*camera.zoom, 20*camera.zoom, [127, 127, 127, 0.5])
+            //         wx = x+sp[0]*res
+            //         wy = y+sp[1]*res
+            //         values = [getVal(wx, wy), getVal(wx+1, wy), getVal(wx+1, wy+1), getVal(wx, wy+1)]
+            //         values2 = [values[0] > min ? 1 : 0, values[1] > min ? 1 : 0, values[2] > min ? 1 : 0, values[3] > min ? 1 : 0]
+            //         // values[0] += min/2; values[1] += min/2; values[2] += min/2; values[3] += min/2
+            //         id = values2[0]*1 + values2[1]*2 + values2[2]*4 + values2[3]*8
 
-                    let a = {}; let b = {}; let c = {}; let d = {}
-                    if (smoothing) {
-                        a = {x: x*s + sp[0]*500 + intWeights(0, values[1], s, values[0]), y: y*s + sp[1]*500}
-                        b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + intWeights(0, values[2], s, values[1])}
-                        c = {x: x*s + sp[0]*500 + intWeights(0, values[2], s, values[3]), y: y*s + sp[1]*500 + s}
-                        d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + intWeights(0, values[3], s, values[0])}
-                    } else {
-                        a = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500}
-                        b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s/2}
-                        c = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500 + s}
-                        d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s/2}
-                    }
+            //         let a = {}; let b = {}; let c = {}; let d = {}
+            //         if (smoothing) {
+            //             a = {x: x*s + sp[0]*500 + intWeights(0, values[1], s, values[0]), y: y*s + sp[1]*500}
+            //             b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + intWeights(0, values[2], s, values[1])}
+            //             c = {x: x*s + sp[0]*500 + intWeights(0, values[2], s, values[3]), y: y*s + sp[1]*500 + s}
+            //             d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + intWeights(0, values[3], s, values[0])}
+            //         } else {
+            //             a = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500}
+            //             b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s/2}
+            //             c = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500 + s}
+            //             d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s/2}
+            //         }
 
-                    let ac = {x: x*s + sp[0]*500, y: y*s + sp[1]*500}
-                    let bc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500}
-                    let cc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s}
-                    let dc = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s}
+            //         let ac = {x: x*s + sp[0]*500, y: y*s + sp[1]*500}
+            //         let bc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500}
+            //         let cc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s}
+            //         let dc = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s}
 
-                    ctx.lineJoin = "round"
-                    ctx.lineWidth = 1*camera.zoom
-                    ctx.strokeStyle = "darkgreen"
-                    ctx.fillStyle = "darkgreen"
+            //         ctx.lineJoin = "round"
+            //         ctx.lineWidth = 1*camera.zoom
+            //         ctx.strokeStyle = "darkgreen"
+            //         ctx.fillStyle = "darkgreen"
 
-                    switch (id) {
-                        case 0:
-                            break
-                        case 1:
-                            // line(d, a)
-                            poly(d, ac, a)
-                            break
-                        case 2:
-                            // line(a, b)
-                            poly(a, bc, b)
-                            break
-                        case 3:
-                            // line(d, b)
-                            poly(ac, bc, b, d)
-                            break
-                        case 4:
-                            // line(b, c)
-                            poly(b, cc, c)
-                            break
-                        case 5:
-                            // line(a, b)
-                            // line(d, c)
-                            poly(d, ac, a, b, cc, c)
-                            break
-                        case 6:
-                            // line(a, c)
-                            poly(bc, cc, c, a)
-                            break
-                        case 7:
-                            // line(d, c)
-                            poly(ac, bc, cc, c, d)
-                            break
-                        case 8:
-                            // line(d, c)
-                            poly(c, dc, d)
-                            break
-                        case 9:
-                            // line(a, c)
-                            poly(ac, a, c, dc)
-                            break
-                        case 10:
-                            // line(a, d)
-                            // line(b, c)
-                            poly(d, a, bc, b, c, dc)
-                            break
-                        case 11:
-                            // line(b, c)
-                            poly(dc, ac, bc, b, c)
-                            break
-                        case 12:
-                            // line(d, b)
-                            poly(dc, cc, b, d)
-                            break
-                        case 13:
-                            // line(a, b)
-                            poly(ac, a, b, cc, dc)
-                            break
-                        case 14:
-                            // line(a, d)
-                            poly(a, d, dc, cc, bc)
-                            break
-                        case 15:
-                            poly(ac, bc, cc, dc)
-                            break
-                    }
-                }
-            }
+            //         switch (id) {
+            //             case 0:
+            //                 break
+            //             case 1:
+            //                 // line(d, a)
+            //                 poly(d, ac, a)
+            //                 break
+            //             case 2:
+            //                 // line(a, b)
+            //                 poly(a, bc, b)
+            //                 break
+            //             case 3:
+            //                 // line(d, b)
+            //                 poly(ac, bc, b, d)
+            //                 break
+            //             case 4:
+            //                 // line(b, c)
+            //                 poly(b, cc, c)
+            //                 break
+            //             case 5:
+            //                 // line(a, b)
+            //                 // line(d, c)
+            //                 poly(d, ac, a, b, cc, c)
+            //                 break
+            //             case 6:
+            //                 // line(a, c)
+            //                 poly(bc, cc, c, a)
+            //                 break
+            //             case 7:
+            //                 // line(d, c)
+            //                 poly(ac, bc, cc, c, d)
+            //                 break
+            //             case 8:
+            //                 // line(d, c)
+            //                 poly(c, dc, d)
+            //                 break
+            //             case 9:
+            //                 // line(a, c)
+            //                 poly(ac, a, c, dc)
+            //                 break
+            //             case 10:
+            //                 // line(a, d)
+            //                 // line(b, c)
+            //                 poly(d, a, bc, b, c, dc)
+            //                 break
+            //             case 11:
+            //                 // line(b, c)
+            //                 poly(dc, ac, bc, b, c)
+            //                 break
+            //             case 12:
+            //                 // line(d, b)
+            //                 poly(dc, cc, b, d)
+            //                 break
+            //             case 13:
+            //                 // line(a, b)
+            //                 poly(ac, a, b, cc, dc)
+            //                 break
+            //             case 14:
+            //                 // line(a, d)
+            //                 poly(a, d, dc, cc, bc)
+            //                 break
+            //             case 15:
+            //                 poly(ac, bc, cc, dc)
+            //                 break
+            //         }
+            //     }
+            // }
         } else {
             delete chunks[chunk]
         }
@@ -388,7 +547,7 @@ function tick(timestamp) {
         }
     }
 
-    ui.circle(cx(player.x), cy(player.y), 10*camera.zoom, [0, 100, 200, 1])
+    ui.circle(cx(player.x), cy(player.y), 10*camera.zoom, [0, 100, 200, orig ? 0.5 : 1])
 
     for (let player in playerData) {
         if (!(player in players)) {
@@ -416,7 +575,7 @@ function tick(timestamp) {
     camera.y = lerp(camera.y, player.y, delta*10)
     camera.zoom = lerp(camera.zoom, su*3*tzoom, delta*10)
     
-    // hey silver i bet you'll never find this line of code
+    // hey silver i bet you'll never find player line of code
     // -blazingfish
     // hey blazingfish i found your line of code
     // -silver
@@ -512,6 +671,57 @@ input.checkInputs = (event) => {
     input.cistart()
 
     input.ciend()
+}
+
+function findIntersection(a,b,c,d,p,q,r,s) {
+    var det, gamma, lambda
+    det = (c - a) * (s - q) - (r - p) * (d - b)
+    if (det === 0) {
+        return false
+    } else {
+        lambda = ((s - q) * (r - a) + (p - r) * (s - b)) / det
+        gamma = ((b - d) * (r - a) + (c - a) * (s - b)) / det
+        return (0 < lambda && lambda < 1) && (0 < gamma && gamma < 1)
+    }
+}
+
+var fixDistance = 0
+
+function fixCollision() {
+    let splits = 16
+    let collided = false
+    let moved = 0
+    let solutions = []
+    // let start = new Date().getTime()
+    while (moved < 500) {
+        solutions = []
+        for (let angleI = 0; angleI < splits; angleI++) {
+            let angle = Math.PI*2 / splits * angleI
+            player.x += Math.sin(angle)*fixDistance
+            player.y += Math.cos(angle)*fixDistance
+            if (!isColliding()) {
+                solutions.push(angleI)
+                // player.fixDistance = 0
+                // return collided
+            }
+            player.x -= Math.sin(angle)*fixDistance
+            player.y -= Math.cos(angle)*fixDistance
+            collided = true
+        }
+
+        if (solutions.length > 0) {
+            let angle = Math.PI*2 / splits * solutions[0]
+            player.x += Math.sin(angle)*fixDistance
+            player.y += Math.cos(angle)*fixDistance
+            fixDistance = 0
+            return
+        }
+
+        fixDistance += 0.1
+        moved += 0.1
+        // console.log(start, Date.now(), Date.now()-start)
+    }
+    return collided
 }
 
 requestAnimationFrame(tick)

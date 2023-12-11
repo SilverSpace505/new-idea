@@ -82,7 +82,7 @@ function connectToServer() {
         }
         if ("set" in msg) {
             let sp = msg.set[0].split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
-            setVal(msg.set[1]+sp[0]*res, msg.set[2]+sp[1]*res, msg.set[3])
+            setting.push([msg.set[1]+sp[0]*res, msg.set[2]+sp[1]*res, msg.set[3], 0])
         }
     })
 
