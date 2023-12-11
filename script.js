@@ -43,8 +43,8 @@ function isColliding() {
 function intWeights(v1, w1, v2, w2) {
     if (w1 < 0) w1 = 0
     if (w2 < 0) w2 = 0
-    let total = w1+w2
-    return  (w1 * v1 + w2 * v2) / total
+    let t = w1 / (w2 - w1)
+    return v1 + (v2-v1) * (w2 / (w1+w2))
 }
 
 function getVal(x, y) {
@@ -100,8 +100,8 @@ setInterval(() => {
         // d += 25*0.75
         if (true) {
             console.log(v)
-            let ps = setVal(ro.x, ro.y, d)
-            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], 0.75]})
+            let ps = setVal(ro.x, ro.y, 1)
+            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], 1]})
         }
     }
 }, 1000/10)
@@ -193,8 +193,10 @@ function tick(timestamp) {
                 for (let x = 0; x < 20; x++) {
                     for (let y = 0; y < 20; y++) {
                         let i = x*20+y
-                        if (getVal(x+sp[0]*20, y+sp[1]*20) > 0.5) {
-                            ui.circle(cx(sp[0]*500 + x*25), cy(sp[1]*500 + y*25), 5*camera.zoom, [0, 0, 0, 1])
+                        let v = getVal(x+sp[0]*20, y+sp[1]*20)
+                        if (v > 0.5) {
+                            v -= 0.5
+                            ui.circle(cx(sp[0]*500 + x*25), cy(sp[1]*500 + y*25), 5*camera.zoom, [v*255, v*255, v*255, 1])
                         }
                     }
                 }
@@ -214,7 +216,7 @@ function tick(timestamp) {
                     wy = y+sp[1]*20
                     values = [getVal(wx, wy), getVal(wx+1, wy), getVal(wx+1, wy+1), getVal(wx, wy+1)]
                     values2 = [values[0] > min ? 1 : 0, values[1] > min ? 1 : 0, values[2] > min ? 1 : 0, values[3] > min ? 1 : 0]
-                    values[0] += min/2; values[1] += min/2; values[2] += min/2; values[3] += min/2
+                    // values[0] += min/2; values[1] += min/2; values[2] += min/2; values[3] += min/2
                     id = values2[0]*1 + values2[1]*2 + values2[2]*4 + values2[3]*8
 
                     let a = {}; let b = {}; let c = {}; let d = {}
@@ -415,7 +417,7 @@ function genChunk(x, y) {
             wx = gx+x*20
             wy = gy+y*20
             // grid.push(Math.sin(wx/10)*Math.sin(wy/10))
-            grid.push(rand(id)*rand(id) + Math.sin(wx/10)*Math.sin(wy/10))
+            grid.push(Math.sin(wx/10)*Math.sin(wy/10))
         }
     }
     chunks[x+","+y] = {objs: objs, grid: grid}
