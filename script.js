@@ -7,6 +7,9 @@ var su = 0
 var delta = 0
 var lastTime = 0
 
+var res = 40
+var s = 0
+
 ui.textShadow.bottom = "auto"
 
 var camera = {x: 0, y: 0, zoom: 1}
@@ -17,6 +20,8 @@ var players = {}
 
 var chunks = {}
 var loadingChunks = []
+
+var setting = []
 
 var tzoom = 1
 
@@ -41,32 +46,38 @@ function isColliding() {
 }
 
 function intWeights(v1, w1, v2, w2) {
-    if (w1 < 0) w1 = 0
-    if (w2 < 0) w2 = 0
-    let t = w1 / (w2 - w1)
-    return v1 + (v2-v1) * (w2 / (w1+w2))
+    let total = w1+w2
+    w1 /= total
+    w2 /= total
+    return v1*w1 + v2*w2
 }
 
 function getVal(x, y) {
     x = Math.round(x)
     y = Math.round(y)
-    let cp = [Math.floor(x/20), Math.floor(y/20)]
-    let cip = [x-cp[0]*20, y-cp[1]*20]
+    let cp = [Math.floor(x/res), Math.floor(y/res)]
+    let cip = [x-cp[0]*res, y-cp[1]*res]
     let chunk = cp[0]+","+cp[1]
     if (chunk in chunks) {
-        return chunks[chunk].grid[cip[0]*20+cip[1]]
+        return chunks[chunk].grid[cip[0]*res+cip[1]]
     } else {
         return 0
     }
 }
 
 function setVal(x, y, v) {
-    let cp = [Math.floor(x/20), Math.floor(y/20)]
-    let cip = [x-cp[0]*20, y-cp[1]*20]
+    let cp = [Math.floor(x/res), Math.floor(y/res)]
+    let cip = [x-cp[0]*res, y-cp[1]*res]
     let chunk = cp[0]+","+cp[1]
     if (chunk in chunks) {
-        chunks[chunk].grid[cip[0]*20+cip[1]] = v
+        chunks[chunk].grid[cip[0]*res+cip[1]] = v
     }
+    return [cp, cip]
+}
+
+function getC(x, y) {
+    let cp = [Math.floor(x/res), Math.floor(y/res)]
+    let cip = [x-cp[0]*res, y-cp[1]*res]
     return [cp, cip]
 }
 
@@ -77,31 +88,64 @@ function line(vec1, vec2) {
     ctx.stroke()
 }
 
+function tri(vec1, vec2, vec3) {
+    ctx.beginPath()
+    ctx.moveTo(cx(vec1.x), cy(vec1.y))
+    ctx.lineTo(cx(vec2.x), cy(vec2.y))
+    ctx.lineTo(cx(vec3.x), cy(vec3.y))
+    ctx.lineTo(cx(vec1.x), cy(vec1.y))
+    ctx.fill()
+}
+
+function poly(...points) {
+    ctx.beginPath()
+    ctx.moveTo(cx(points[0].x), cy(points[0].y))
+    for (let i = 1; i < points.length; i++) {
+        ctx.lineTo(cx(points[i].x), cy(points[i].y))
+    }
+    ctx.lineTo(cx(points[0].x), cy(points[0].y))
+    ctx.stroke()
+    ctx.fill()
+}
+
 setInterval(() => {
     input.setGlobals()
     let wmouse = {x: (mouse.x - canvas.width/2)/camera.zoom + camera.x, y: (mouse.y - canvas.height/2)/camera.zoom + camera.y}
     if (mouse.ldown && !keys["ShiftLeft"]) {
-        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
-        let d = Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)/2
-        let v = getVal(ro.x/25, ro.y/25)
-        if (d/25 < v) {
-            let ps = setVal(ro.x/25, ro.y/25, d/25)
-            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], d/25]})
+        let ro = {x: Math.round(wmouse.x/s)*s, y: Math.round(wmouse.y/s)*s}
+        let offs = []
+        for (let x = 0; x < 9; x++) {
+            for (let y = 0; y < 9; y++) {
+                offs.push([x-5, y-5])
+            }
+        }
+        for (let off of offs) {
+            let d = Math.sqrt((ro.x+off[0]*s-wmouse.x)**2 + (ro.y+off[1]*s-wmouse.y)**2)/3.5
+            let v = getVal(ro.x/s + off[0], ro.y/s + off[1])
+            if (d/s < v) {
+                let ps = getC(ro.x/s + off[0], ro.y/s + off[1])
+                setting.push([ro.x/s + off[0], ro.y/s + off[1], d/s, 0])
+                sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], d/s]})
+            }
         }
     }
 
     if (mouse.rdown && !keys["ShiftLeft"]) {
-        let ro = {x: Math.round(wmouse.x/25), y: Math.round(wmouse.y/25)}
-        let d = 1-Math.sqrt((ro.x*25-wmouse.x)**2 + (ro.y*25-wmouse.y)**2)/25
-        let v = getVal(ro.x/25, ro.y/25)
-        // if (d/25 > 0.25) {
-        //     d = 25*0.25
-        // }
-        // d += 25*0.75
-        if (true) {
-            console.log(v)
-            let ps = setVal(ro.x, ro.y, 1)
-            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], 1]})
+        let ro = {x: Math.round(wmouse.x/s)*s, y: Math.round(wmouse.y/s)*s}
+        let offs = []
+        for (let x = 0; x < 9; x++) {
+            for (let y = 0; y < 9; y++) {
+                offs.push([x-5, y-5])
+            }
+        }
+        for (let off of offs) {
+            let d = s - Math.sqrt((ro.x+off[0]*s-wmouse.x)**2 + (ro.y+off[1]*s-wmouse.y)**2)/3.5
+            let v = getVal(ro.x/s + off[0], ro.y/s + off[1])
+            if (d/s > v) {
+                let ps = getC(ro.x/s + off[0], ro.y/s + off[1])
+                setting.push([ro.x/s + off[0], ro.y/s + off[1], d/s, 0])
+                sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], d/s]})
+            }
         }
     }
 }, 1000/10)
@@ -116,12 +160,26 @@ function tick(timestamp) {
 
     let orig = isColliding()
 
+    s = 500/res
+
+    for (let i = 0; i < setting.length; i++) {
+        let set = setting[i]
+        let v = getVal(set[0], set[1])
+        set[3] += delta
+        setVal(set[0], set[1], lerp(v, set[2], delta*20))
+        if (Math.abs(v - set[2]) < 0.01 || set[3] > 0.1) {
+            setVal(set[0], set[1], set[2])
+            setting.splice(i, 1)
+            i--
+        }
+    }
+
     let last = {x: player.x, y: player.y}
     if (keys["KeyW"]) {
-        player.y -= 250*delta
+        player.y -= 150*delta
     }
     if (keys["KeyS"]) {
-        player.y += 250*delta
+        player.y += 150*delta
     }
 
     if (!orig && isColliding()) {
@@ -129,10 +187,10 @@ function tick(timestamp) {
     }
 
     if (keys["KeyA"]) {
-        player.x -= 250*delta
+        player.x -= 150*delta
     }
     if (keys["KeyD"]) {
-        player.x += 250*delta
+        player.x += 150*delta
     }
 
     if (!orig && isColliding()) {
@@ -170,8 +228,8 @@ function tick(timestamp) {
     }
     ui.rect(canvas.width/2, canvas.height/2, canvas.width, canvas.height, [60, 180, 0, 1])
 
-    let cp = {x: Math.floor(player.x/500), y: Math.floor(player.y/500)}
-    let rd = {x: 2, y: 2}
+    let cp = {x: Math.round(player.x/500), y: Math.round(player.y/500)}
+    let rd = {x: 1, y: 1}
     let x2 = 0
     let y2 = 0
     let poses = []
@@ -190,13 +248,14 @@ function tick(timestamp) {
         if (poses.includes(chunk)) {
             let sp = chunk.split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
             if (keys["KeyE"]) {
-                for (let x = 0; x < 20; x++) {
-                    for (let y = 0; y < 20; y++) {
-                        let i = x*20+y
-                        let v = getVal(x+sp[0]*20, y+sp[1]*20)
-                        if (v > 0.5) {
-                            v -= 0.5
-                            ui.circle(cx(sp[0]*500 + x*25), cy(sp[1]*500 + y*25), 5*camera.zoom, [v*255, v*255, v*255, 1])
+                for (let x = 0; x < res; x++) {
+                    for (let y = 0; y < res; y++) {
+                        let i = x*res+y
+                        let v = getVal(x+sp[0]*res, y+sp[1]*res)
+                        if (v < 0) console.log("OH NO")
+                        if (true) {
+                            
+                            ui.circle(cx(sp[0]*500 + x*s), cy(sp[1]*500 + y*s), 5*camera.zoom, [v*255, v*255, v*255, 1])
                         }
                     }
                 }
@@ -209,11 +268,11 @@ function tick(timestamp) {
             let wx = 0
             let wy = 0
             let smoothing = !keys["Space"]
-            for (let x = 0; x < 20; x++) {
-                for (let y = 0; y < 20; y++) {
+            for (let x = 0; x < res; x++) {
+                for (let y = 0; y < res; y++) {
                     // ui.rect(cx(x*25 + sp[0]*500 + 12.5), cy(y*25 + sp[1]*500 + 12.5), 20*camera.zoom, 20*camera.zoom, [127, 127, 127, 0.5])
-                    wx = x+sp[0]*20
-                    wy = y+sp[1]*20
+                    wx = x+sp[0]*res
+                    wy = y+sp[1]*res
                     values = [getVal(wx, wy), getVal(wx+1, wy), getVal(wx+1, wy+1), getVal(wx, wy+1)]
                     values2 = [values[0] > min ? 1 : 0, values[1] > min ? 1 : 0, values[2] > min ? 1 : 0, values[3] > min ? 1 : 0]
                     // values[0] += min/2; values[1] += min/2; values[2] += min/2; values[3] += min/2
@@ -221,84 +280,90 @@ function tick(timestamp) {
 
                     let a = {}; let b = {}; let c = {}; let d = {}
                     if (smoothing) {
-                        a = {x: x*25 + sp[0]*500 + intWeights(0, values[0], 25, values[1]), y: y*25 + sp[1]*500}
-                        b = {x: x*25 + sp[0]*500 + 25, y: y*25 + sp[1]*500 + intWeights(0, values[1], 25, values[2])}
-                        c = {x: x*25 + sp[0]*500 + intWeights(0, values[3], 25, values[2]), y: y*25 + sp[1]*500 + 25}
-                        d = {x: x*25 + sp[0]*500, y: y*25 + sp[1]*500 + intWeights(0, values[0], 25, values[3])}
+                        a = {x: x*s + sp[0]*500 + intWeights(0, values[1], s, values[0]), y: y*s + sp[1]*500}
+                        b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + intWeights(0, values[2], s, values[1])}
+                        c = {x: x*s + sp[0]*500 + intWeights(0, values[2], s, values[3]), y: y*s + sp[1]*500 + s}
+                        d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + intWeights(0, values[3], s, values[0])}
                     } else {
-                        a = {x: x*25 + sp[0]*500 + 12.5, y: y*25 + sp[1]*500}
-                        b = {x: x*25 + sp[0]*500 + 25, y: y*25 + sp[1]*500 + 12.5}
-                        c = {x: x*25 + sp[0]*500 + 12.5, y: y*25 + sp[1]*500 + 25}
-                        d = {x: x*25 + sp[0]*500, y: y*25 + sp[1]*500 + 12.5}
+                        a = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500}
+                        b = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s/2}
+                        c = {x: x*s + sp[0]*500 + s/2, y: y*s + sp[1]*500 + s}
+                        d = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s/2}
                     }
 
-                    ctx.lineWidth = 3*camera.zoom
+                    let ac = {x: x*s + sp[0]*500, y: y*s + sp[1]*500}
+                    let bc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500}
+                    let cc = {x: x*s + sp[0]*500 + s, y: y*s + sp[1]*500 + s}
+                    let dc = {x: x*s + sp[0]*500, y: y*s + sp[1]*500 + s}
+
+                    ctx.lineJoin = "round"
+                    ctx.lineWidth = 1*camera.zoom
                     ctx.strokeStyle = "darkgreen"
+                    ctx.fillStyle = "darkgreen"
 
                     switch (id) {
                         case 0:
                             break
                         case 1:
-                            line(d, a)
+                            // line(d, a)
+                            poly(d, ac, a)
                             break
                         case 2:
-                            line(a, b)
+                            // line(a, b)
+                            poly(a, bc, b)
                             break
                         case 3:
-                            line(d, b)
+                            // line(d, b)
+                            poly(ac, bc, b, d)
                             break
                         case 4:
-                            line(b, c)
+                            // line(b, c)
+                            poly(b, cc, c)
                             break
                         case 5:
-                            line(a, b)
-                            line(d, c)
+                            // line(a, b)
+                            // line(d, c)
+                            poly(d, ac, a, b, cc, c)
                             break
                         case 6:
-                            line(a, c)
+                            // line(a, c)
+                            poly(bc, cc, c, a)
                             break
                         case 7:
-                            line(d, c)
-                            // line(d, a)
-                            // line(a, b)
-                            // line(b, c)
+                            // line(d, c)
+                            poly(ac, bc, cc, c, d)
                             break
                         case 8:
-                            line(d, c)
+                            // line(d, c)
+                            poly(c, dc, d)
                             break
                         case 9:
-                            line(a, c)
+                            // line(a, c)
+                            poly(ac, a, c, dc)
                             break
                         case 10:
-                            line(a, d)
-                            line(b, c)
+                            // line(a, d)
+                            // line(b, c)
+                            poly(d, a, bc, b, c, dc)
                             break
                         case 11:
-                            line(b, c)
-                            // line(c, d)
-                            // line(d, a)
-                            // line(a, b)
+                            // line(b, c)
+                            poly(dc, ac, bc, b, c)
                             break
                         case 12:
-                            line(d, b)
+                            // line(d, b)
+                            poly(dc, cc, b, d)
                             break
                         case 13:
-                            line(a, b)
-                            // line(a, d)
-                            // line(d, c)
-                            // line(c, b)
+                            // line(a, b)
+                            poly(ac, a, b, cc, dc)
                             break
                         case 14:
-                            line(a, d)
-                            // line(a, b)
-                            // line(b, c)
-                            // line(c, d)
+                            // line(a, d)
+                            poly(a, d, dc, cc, bc)
                             break
                         case 15:
-                            // line(a, b)
-                            // line(b, c)
-                            // line(c, d)
-                            // line(d, a)
+                            poly(ac, bc, cc, dc)
                             break
                     }
                 }
@@ -323,11 +388,7 @@ function tick(timestamp) {
         }
     }
 
-    camera.x = lerp(camera.x, player.x, delta*10)
-    camera.y = lerp(camera.y, player.y, delta*10)
-    camera.zoom = lerp(camera.zoom, su*3*tzoom, delta*10)
-
-    ui.circle(cx(player.x), cy(player.y), 15*camera.zoom, [0, 100, 200, 1])
+    ui.circle(cx(player.x), cy(player.y), 10*camera.zoom, [0, 100, 200, 1])
 
     for (let player in playerData) {
         if (!(player in players)) {
@@ -348,8 +409,12 @@ function tick(timestamp) {
             players[player].x = playerData[player].x
             players[player].y = playerData[player].y
         }
-        ui.circle(cx(players[player].x), cy(players[player].y), 15*camera.zoom, [0, 100, 200, 1])
+        ui.circle(cx(players[player].x), cy(players[player].y), 10*camera.zoom, [0, 100, 200, 1])
     }
+
+    camera.x = lerp(camera.x, player.x, delta*10)
+    camera.y = lerp(camera.y, player.y, delta*10)
+    camera.zoom = lerp(camera.zoom, su*3*tzoom, delta*10)
     
     // hey silver i bet you'll never find this line of code
     // -blazingfish
@@ -412,12 +477,13 @@ function genChunk(x, y) {
     let grid = []
     let wx = 0
     let wy = 0
-    for (let gx = 0; gx < 20; gx++) {
-        for (let gy = 0; gy < 20; gy++) {
-            wx = gx+x*20
-            wy = gy+y*20
-            // grid.push(Math.sin(wx/10)*Math.sin(wy/10))
-            grid.push(Math.sin(wx/10)*Math.sin(wy/10))
+    for (let gx = 0; gx < res; gx++) {
+        for (let gy = 0; gy < res; gy++) {
+            wx = gx+x*res
+            wy = gy+y*res
+            grid.push( (((Math.sin(wx/10)+1)/2) * ((Math.sin(wy/10)+1)/2)) )
+            // console.log((Math.sin(wx/10)+1)/2*((Math.cos(wy/10)+1)/2))
+            // grid.push(((Math.sin(wx/10)+1)/2+(Math.cos(wy/10)+1)/2)/2)
         }
     }
     chunks[x+","+y] = {objs: objs, grid: grid}

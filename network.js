@@ -59,7 +59,7 @@ function connectToServer() {
                     }
                 }
                 for (let set of data.sets) {
-                    setVal(set[0]+sp[0]*20, set[1]+sp[1]*20, set[2])
+                    setVal(set[0]+sp[0]*res, set[1]+sp[1]*res, set[2])
                 }
             }
         }
@@ -82,7 +82,7 @@ function connectToServer() {
         }
         if ("set" in msg) {
             let sp = msg.set[0].split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
-            setVal(msg.set[1]+sp[0]*20, msg.set[2]+sp[1]*20, msg.set[3])
+            setVal(msg.set[1]+sp[0]*res, msg.set[2]+sp[1]*res, msg.set[3])
         }
     })
 
