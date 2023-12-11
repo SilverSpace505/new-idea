@@ -48,6 +48,8 @@ function intWeights(v1, w1, v2, w2) {
 }
 
 function getVal(x, y) {
+    x = Math.round(x)
+    y = Math.round(y)
     let cp = [Math.floor(x/20), Math.floor(y/20)]
     let cip = [x-cp[0]*20, y-cp[1]*20]
     let chunk = cp[0]+","+cp[1]
@@ -89,15 +91,17 @@ setInterval(() => {
     }
 
     if (mouse.rdown && !keys["ShiftLeft"]) {
-        let ro = {x: Math.round(wmouse.x/25)*25, y: Math.round(wmouse.y/25)*25}
-        let d = 25-Math.sqrt((ro.x-wmouse.x)**2 + (ro.y-wmouse.y)**2)
+        let ro = {x: Math.round(wmouse.x/25), y: Math.round(wmouse.y/25)}
+        let d = 1-Math.sqrt((ro.x*25-wmouse.x)**2 + (ro.y*25-wmouse.y)**2)/25
         let v = getVal(ro.x/25, ro.y/25)
-        if (d/25 > 1) {
-            d = 25
-        }
-        if (d/25 > v) {
-            let ps = setVal(ro.x/25, ro.y/25, d/25)
-            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], d/25]})
+        // if (d/25 > 0.25) {
+        //     d = 25*0.25
+        // }
+        // d += 25*0.75
+        if (true) {
+            console.log(v)
+            let ps = setVal(ro.x, ro.y, d)
+            sendMsg({set: [ps[0][0]+","+ps[0][1], ps[1][0], ps[1][1], 0.75]})
         }
     }
 }, 1000/10)
@@ -185,11 +189,13 @@ function tick(timestamp) {
     for (let chunk in chunks) {
         if (poses.includes(chunk)) {
             let sp = chunk.split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
-            for (let x = 0; x < 20; x++) {
-                for (let y = 0; y < 20; y++) {
-                    let i = x*20+y
-                    if (getVal(x+sp[0]*20, y+sp[1]*20) > 0.5) {
-                        // ui.circle(cx(sp[0]*500 + x*25), cy(sp[1]*500 + y*25), 5*camera.zoom, [0, 0, 0, 1])
+            if (keys["KeyE"]) {
+                for (let x = 0; x < 20; x++) {
+                    for (let y = 0; y < 20; y++) {
+                        let i = x*20+y
+                        if (getVal(x+sp[0]*20, y+sp[1]*20) > 0.5) {
+                            ui.circle(cx(sp[0]*500 + x*25), cy(sp[1]*500 + y*25), 5*camera.zoom, [0, 0, 0, 1])
+                        }
                     }
                 }
             }

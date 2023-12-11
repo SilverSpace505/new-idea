@@ -81,7 +81,6 @@ function connectToServer() {
             }
         }
         if ("set" in msg) {
-            console.log("YAY", msg.set)
             let sp = msg.set[0].split(","); sp[0] = parseInt(sp[0]); sp[1] = parseInt(sp[1])
             setVal(msg.set[1]+sp[0]*20, msg.set[2]+sp[1]*20, msg.set[3])
         }
